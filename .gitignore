@@ -216,3 +216,30 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Project outputs
+#
+# Everything below is something we GENERATE and can regenerate by re-running
+# the pipeline. The inputs we were given are tracked on purpose: data/,
+# model/ and src/vendor/ are committed.
+#
+# CONTRIBUTING: "/data - small sample and fixture data only. Never secrets,
+# never generated output."
+# ---------------------------------------------------------------------------
+
+# Submissions built by src/pipeline/submission.py.
+# The negation matters: without it this pattern also swallows the tracked
+# format reference, which would bite the first time anyone re-adds it.
+submission*.csv
+!data/submission_example.csv
+
+# Repaired weights and cached arrays we write out. Neither pattern can match
+# the given model/*.npz inputs, so they stay tracked without a negation.
+*_repaired.npz
+*.npy
+
+# Scratch space: run artifacts, cached activations, plots for the writeup
+outputs/
+figures/
+scratch/

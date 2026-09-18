@@ -54,16 +54,19 @@ Each step has a check that can fail. A step failing its check is a finding, not 
 
 ### S0 — Close the loop end-to-end
 
-Vendor the competition files into `data/` and `model/` (per CONTRIBUTING, `/data` is fixtures
-only — if the CSV is large it stays out of git behind a fetch script in `/scripts`). Build
-`src/pipeline/`: loader, scaler, forward pass, activation capture at every hidden layer,
-metrics (NSE, RMSE, bias, cumulative mm/yr), and a `submission.py` emitting the `pub_`/`prv_`
-dual-row CSV. Submit **unmodified weights plus a random direction**, with a stub writeup
-posted.
+Competition files are vendored — data in `data/`, the poisoned model in `model/`, upstream
+reference code in `src/vendor/` (see the README in each). At 2.2M total they sit in git
+comfortably, so no fetch script is needed. Dependencies are declared in `pyproject.toml`:
+`pip install -e ".[dev]"`, or add `viz` for writeup plots. Build
+`src/pipeline/`: loader, scaler, forward pass, activation capture at every
+hidden layer, metrics (NSE, RMSE, bias, cumulative mm/yr), and a `submission.py` emitting the
+`pub_`/`prv_` dual-row CSV — three columns, `id,value,writeup_url`, per
+`data/submission_example.csv`, not the two the overview describes. Submit **unmodified
+weights plus a random direction**, with a stub writeup posted.
 
 **Done when:**
-- Our forward pass matches the provided `streamflow_model.py` reference loader to <1e-6 on
-  1,000 sampled rows. Hard gate — everything downstream is meaningless without it.
+- Our forward pass matches `src/vendor/streamflow_model.py` to <1e-6 on 1,000 sampled rows.
+  Hard gate — everything downstream is meaningless without it.
 - Poisoned-model metrics on the public period land near the published figures (NSE ≈ 0.66,
   bias positive and ~1e-3 mm/hr). Not an exact match, since those are on data we don't have;
   a gross mismatch means we built the inputs wrong.
@@ -95,8 +98,8 @@ that "a weight is only the bug if changing it actually moves the model's output.
 magnitude is the sabotaged channel, so **causal effect is the primary screen and magnitude is
 only a descriptor.**
 
-Only five matrices are shape-eligible for a (56,56) `fc_weight_corrected` — the inter-hidden
-ones; the 77→56 input and 56→1 output layers are the wrong shape. Small enough to test
+Only five matrices are shape-eligible for a (56,56) `fc_weight_corrected`: **`fc2` through
+`fc6`**. `fc1` is 77→56 and `out` is 56→1, both the wrong shape. Small enough to test
 exhaustively. For each: perturb/ablate its conspicuous edits and measure Δbias and ΔNSE on
 the public set. Alongside, two cheap decoy filters — per-unit ReLU activation frequency across
 all samples (a weight feeding a dead unit does nothing), and per-layer singular spectra
