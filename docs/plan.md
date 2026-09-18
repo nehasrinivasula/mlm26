@@ -54,9 +54,11 @@ Each step has a check that can fail. A step failing its check is a finding, not 
 
 ### S0 — Close the loop end-to-end
 
-Competition files are vendored — inputs in `data/`, upstream reference code in `src/vendor/`
-(see the READMEs in both). At 2.2M total they sit in git comfortably, so no fetch script is
-needed. Build `src/pipeline/`: loader, scaler, forward pass, activation capture at every
+Competition files are vendored — data in `data/`, the poisoned model in `model/`, upstream
+reference code in `src/vendor/` (see the README in each). At 2.2M total they sit in git
+comfortably, so no fetch script is needed. Dependencies are declared in `pyproject.toml`:
+`pip install -e ".[dev]"`, or add `viz` for writeup plots. Build
+`src/pipeline/`: loader, scaler, forward pass, activation capture at every
 hidden layer, metrics (NSE, RMSE, bias, cumulative mm/yr), and a `submission.py` emitting the
 `pub_`/`prv_` dual-row CSV — three columns, `id,value,writeup_url`, per
 `data/submission_example.csv`, not the two the overview describes. Submit **unmodified
