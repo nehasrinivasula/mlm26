@@ -107,7 +107,7 @@ def build_features(data_csv, scaler_json):
         #each is a feature input with 72 rainfall mm and then 5 others as placeholder
     # print(rain_windows) 
     # print(rain_windows.shape)
-    print(rain[:6])                 # first 6 hours of raw rain
+    # print(rain[:6])                 # first 6 hours of raw rain
     # print(rain_windows[:3, :6])     # first 3 windows, first 6 lags
     # print((rain > 0).mean())   # 有雨的小时占比
     # print(rain.max())          # 最大小时雨量
@@ -115,7 +115,7 @@ def build_features(data_csv, scaler_json):
 
     # The windows start at row 71, so line the data frame up with them
     df_windowed = df.iloc[RAIN_WINDOW-1:].reset_index(drop=True)
-    print(df_windowed)
+    # print(df_windowed)
     # We want to keep only hours that have all features and a finite rainfall window
     has_features = df_windowed[STATIC_FEATURES].notna().all(axis=1)
     finite_window = np.isfinite(rain_windows).all(axis=1)
@@ -124,13 +124,13 @@ def build_features(data_csv, scaler_json):
 
     # Assemble the 77 inputs: 72 rainfall values + 5 static features, then z-score everythin
     static_values = df_windowed.loc[keep, STATIC_FEATURES].values.astype(np.float32)
-    print(static_values)
+    # print(static_values)
     raw_inputs = np.concatenate([rain_windows[keep], static_values], axis=1)
     X = ((raw_inputs  - mu) / sigma).astype(np.float32)
 
     # Rolling 24-hour rainfall, lined up the same way as the inputs
     sum24_full = pd.Series(rain).rolling(24, min_periods=1).sum().values
-    print(sum24_full)
+    # print(sum24_full)
     sum24 = sum24_full[RAIN_WINDOW - 1:][keep].astype(np.float32)
 
 
