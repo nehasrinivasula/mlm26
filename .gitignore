@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local Data & Kaggle Files
+data/
+*.csv
+*.parquet
+*.feather
+*.zip
+*.tar.gz
+*.json
+*.npz
+*.npy
+
+# OS specific files
+.DS_Store
+Thumbs.db
