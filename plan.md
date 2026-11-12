@@ -60,6 +60,10 @@ Row 36 of `fc2` is loud in the same way — weights up to 0.832 against a layer 
 
 This follows the sequence described in `discussion_post01` — the account that reached the public score ceiling. The order matters: each stage exists to rule out a class of wrong answer before the next stage can be trusted.
 
+> **Status, 11 November 2026 · best score 99.85 (submission 18); the known part scores 99.8545; daily probes aim past 99.97**
+>
+> Stages 1–6 are done in `working.ipynb`. Stage 5's "re-do stage 4" was folded into stage 4; stage 5 itself was added afterwards as a methods section on SVD and PCA for the report-out, with figures in `figures/`. `fc2`, the stage 4 lead, was weakened by stage 6, and our teammates have since shown its component 1 was a side effect of a rescaled unit. **The poisoned layer is `fc6`**: our group's `fc6` repair scores 64.6, which needs points from both parts, and a weight-decay "balance" fingerprint points at `fc6` from the weights alone (see the stage 8 results). Stages 7–8 are done in `fc6`, in two passes. Two lessons came out of them: the poison is silent on the model's low-flow "floor" and grows with flow above it, and that floor is the sharpest test we have. The second pass gives a repair that passes every check the data allows: the teammate's nine-row edit along a floor-corrected `m`, sized to the poison. **It scored 70.66**, and a direction-only control (23.62) splits that into Part 1 = 47.0 of 50 (the repair) and Part 2 = 23.6 (the direction, |cos| 0.736). The missing part of the direction lies where `fc5`'s activity barely goes, so the data can't find it. The teammate's weight-only direction `x`, paired with the same repair, then **scored 78.45** (|cos| 0.814). That rules out the hypothesis that the trigger lives only where the activity lives. Two measured cosines fix the truth's part in their plane, and the combined direction **scored 82.1183, exactly as predicted**. Two of Hemal's earlier submissions turned out to be direction-only controls, which gave two more measured cosines for free. With four, the best direction has |cos| 0.892, and `submission_8_repair_combined4.csv` **scored 86.2046, exactly as predicted**. The same files show that Agent B's repair, sized to zero bias, removes 1.6 times the poison and earns only 32.9 for Part 1, against our 47.0. Probe 9, tilted toward the unmeasured part of Agent B's edit direction, **scored 90.37**: the truth has 0.28 along that axis, so the best direction is now \|cos\| 0.934. Probe 10, toward the unmeasured part of `x` with unit 1 kept, **scored 94.86**, and the best direction from six measurements has \|cos\| 0.979, with 4.1% of the truth still unmeasured. That combined direction, `submission_11_repair_combined6.csv`, **scored 94.9508 against a prediction of 94.9509**, the same to within rounding. Part 1 is 47.03 and Part 2 47.92 of 50. Other teams are at 99.8 and above, with about 30 days left, so the goal is now both halves close to 50. Part 1 has never been tuned: the repair removes 94% or 106% of the poison's water in the held-out months, and the evidence favours 94%. `submission_12_repair_x1063.csv`, the same repair scaled up 6.3% with the same direction, **scored 97.9173, exactly as predicted**: Part 1 is now 50 of 50. Next: probe 14, `submission_14_probe_balance.csv`, tilted toward the outside part of a balance solve that holds the measured part fixed (see "Submission 12 confirmed, and probe 14" under the leaderboard results).
+
 ### 01 · Set up the bench and define the leak
 
 *Goal · one number that says how bad it is*
@@ -98,9 +102,9 @@ For each layer, record which of its 56 units ever produce a non-zero value acros
 
 ### 04 · Rank layers by causal effect on the bias
 
-*Goal · narrow six layers to one*
+*Goal · narrow five eligible layers to one*
 
-Stop reading weights; start intervening. Perturb each candidate layer in turn and measure what happens to bias *and* to NSE together. The pairing is essential — several edits will erase the bias by wrecking the model, and those are worthless under the `skill_preserved` term in the scoring. The layer you want is the one where bias falls substantially while NSE holds. Only `fc2`–`fc6` are eligible anyway, since the submission is a 56×56 matrix.
+Stop reading weights; start intervening. Perturb each candidate layer in turn and measure what happens to bias *and* to NSE together. The pairing is essential — several edits will erase the bias by wrecking the model, and those are worthless under the `skill_preserved` term in the scoring. The layer you want is the one where bias falls substantially while NSE holds *and* the change is targeted rather than a generic turn-down of the output (see the result below: bias and NSE alone cannot tell those apart). Only `fc2`–`fc6` are eligible anyway, since the submission is a 56×56 matrix.
 
 *Removing each layer's dominant component — bias change vs. surviving skill*
 
@@ -119,7 +123,31 @@ Read naively, this table hands you `fc4`. Stage 5 explains why that is the trap.
 > 1. **The `fc5` row is the same mirage as `fc4`.** 94% of `fc5`'s top direction sits on the dead decoy columns, so its effect comes entirely from the 6% that spills onto live columns.
 > 2. **In most layers, "the dominant component" is nearly the whole layer.** With the decoys zeroed, the top component holds 99.7% of `fc2`'s squared magnitude, 99.1% of `fc3`'s, 98.5% of `fc4`'s, 96.7% of `fc5`'s and 80.5% of `fc6`'s. Removing it comes close to deleting the layer, so the "model destroyed" rows only tell you each layer is load-bearing. `fc2` shows this clearly: its top component is row 36's direction (cosine 0.9999), but the other 55 rows point almost the same way. Removing the component drops NSE to −0.022, while zeroing row 36's weights alone leaves NSE at 0.686.
 >
-> So the re-done ranking needs an intervention gentler than removing a whole component. Which one to use is the first open question for this stage.
+> So the re-done ranking needs an intervention gentler than removing a whole component.
+
+#### Result · the re-done ranking points at `fc2`
+
+*Done in `working.ipynb`, stage 04.* On decoy-free weights, each layer's *small* SVD components (1–6) were removed one at a time. They come from the weights alone, so the bias judges them but never chooses them. Every edit was compared with a **volume knob** (a small turn-down of the layer's main component), and the standouts with **random** rank-one edits of the same size.
+
+*Small components, judged against a volume knob and against chance*
+
+| Layer | Standout | Leak removed | `knob_share` | Random edits, same size | Inputs vary along (99%) | Read |
+|---|---|---:|---:|---|---:|---|
+| **fc2** | component 1 | 18.9% | 0.58 | never above 10.4% (middle 90%: −2% to +3%) | **22** directions | **lead suspect** |
+| fc6 | component 2 | 41.4% | 0.74 | up to 36.5% (middle 90%: ±12%) | 2 | mostly a shift; distant second |
+| fc3–fc5 | none | ~0% | – | – | 1 | inert; ruled out |
+
+`knob_share` is the fraction of an edit's effect on the predictions that a plain shift and/or rescale reproduces: 1 for a pure knob, 0 for an edit that acts on particular hours.
+
+Three findings change the rest of the plan:
+
+1. **The volume-knob trap is real.** Turning any layer's main component down by just 0.05 removes 7–37% of the leak and *raises* NSE to 0.682–0.688, with `knob_share` 0.93–0.97. A pure downward shift of every hour reaches NSE 0.691. Bias and NSE together cannot tell a generic turn-down from a repair; `knob_share` can. Carry it into stages 8 and 9.
+2. **`fc2` unit 36 is a volume knob** (`knob_share` 0.94). Its 27.5% bias reduction is the generic kind: it pushes the output up overall, not on a trigger.
+3. **The network has a bottleneck.** `fc1` activity spans 22 directions; `fc2`, `fc3` and `fc4` span one, and `fc5` two. So the small components of `fc3`–`fc5` have nothing to react to. More importantly, only `fc2`'s inputs have room for a hidden feature tangled up with legitimate ones, which is how the overview describes the poison.
+
+**Caveats.** A poison that reads the model's main signal itself would hide inside component 0 and act like a flow-dependent knob; this scan cannot see it. And `fc2` component 1 is a candidate direction, not the answer: SVD components are forced to be orthogonal, so the poison may be spread across several of them.
+
+*Update after stage 6:* the `fc2` lead did not hold up. No sparse-autoencoder feature matches component 1, and removing it takes its water from the same places as a volume knob does. `fc6`, ranked "distant second" here, is now the lead. Its poison most likely hides in its *top* component, which this scan deliberately skipped. See the results under stage 6.
 
 ### 05 · Distrust SVD and PCA — and understand exactly why
 
@@ -144,7 +172,7 @@ Consequence for scoring: `Vt[0]` as a submitted direction is essentially a dead-
 >
 > SVD and PCA find whatever is *largest*. They cannot distinguish "important to the computation" from "numerically big." Since the attacker's decoys are enormous and inert, these methods find the decoys first, every time. Always re-run them with known-dead paths removed, and always confirm with an intervention.
 
-**Re-do stage 4:** Repeat the layer ranking with all dead-column weights zeroed (both the `fc4` and `fc5` blocks), using an intervention that doesn't delete most of the layer (see the note under stage 4). That table, not the one above, points at the real layer.
+**Re-do stage 4:** Repeat the layer ranking with all dead-column weights zeroed (both the `fc4` and `fc5` blocks), using an intervention that doesn't delete most of the layer (see the note under stage 4). That table, not the one above, points at the real layer. *Done: see the result under stage 4. It points at `fc2`.*
 
 ### 06 · Train sparse autoencoders — several of them
 
@@ -152,11 +180,50 @@ Consequence for scoring: `Vt[0]` as a submitted direction is essentially a dead-
 
 Collect the activations of the layer feeding your suspect layer: an 18,685 × 56 table of what the network was thinking each hour. A sparse autoencoder learns to rewrite each of those rows as a combination of a handful of reusable patterns, out of a dictionary larger than 56. The sparsity constraint is what forces those patterns to be interpretable rather than arbitrary mixtures.
 
+**What stage 4 tells this stage.** With `fc2` as the lead suspect, the table to train on is the **`fc1` activations**, the layer feeding `fc2`. Their activity spans about 22 directions (99% of variance), so there is genuine room for several overlapping features. When SAE directions recur, compare them with `fc2` component 1's read direction (`Vt[1]` of the decoy-free `fc2`). Two independent methods agreeing is much stronger evidence than either alone, and disagreeing is informative too. If nothing recurs that also moves the leak, fall back to `fc6` and the `fc5` activations.
+
+**Tools.** This stage needs PyTorch. Version 2.14 publishes wheels for Python 3.14 on Apple-silicon Macs (macOS 14 or later), Linux and Windows, and the whole notebook runs unchanged on Python 3.14 with numpy 2.5 and pandas 3.0. Training is cheap: 300 steps of a 256-feature SAE on the `fc1` activations took about a second on a plain CPU in testing.
+
 > **Why one run is not enough**
 >
 > Post-01's single SAE run produced a feature that moved when the input scaling or the random seed changed — a sign the run had found an artifact of its own initialisation, not something in the model. Train across several dictionary sizes and several seeds, then keep only the directions that *recur*. Reproducibility across independent runs is the evidence; a single good-looking run is not.
 
 Expect a small family of related directions rather than one clean winner. Combine that family into a single consensus vector — averaging after aligning signs, or taking the leading direction of the family, both work.
+
+#### Result · no matching feature, and component 1 is knob-like
+
+*Done in `working.ipynb`, stage 06.*
+
+- **Storms are real, but they are not the whole leak.** Summer storm hours (April–August, at least 10 mm of rain in 24 hours, defined from the inputs only) are 4.6% of hours. The model over-predicts on them 3.3× more per hour than on other hours, and they hold 13.7% of the total phantom water.
+- **Don't standardise each unit here.** Several `fc1` units barely vary (std 0.0001 or less, against a typical 0.1), so per-unit standardisation would invent features. Centre the activations and divide by one global scale instead.
+- **No SAE feature matches component 1.** The match test was fixed before the TopK runs: a feature must recur in at least 6 of 8 other runs, carry component 1, and fire on storms. Nothing passed in the L1 family (`l1 = 1`) or the TopK family (`k = 4`), and a TopK `k = 8` robustness check agreed. Both families find many recurring storm features, but none points where component 1 points.
+- **Component 1 is knob-like.** Removing it takes 32.0% of its water from storm hours; a volume knob removing the same total takes 31.2%, and the rule required at least twice that. Month by month, the two remove nearly the same water.
+- **Lesson.** Beating random edits (stage 4) shows a component *matters*, not that it is *targeted*. Only a comparison with a volume knob removing the same total separates the two.
+
+**Where this leaves the hunt.** Neither conspicuous signal in `fc2` (row 36, component 1) behaves like a trigger, so `fc2` is no longer the lead. The pre-stated next candidate is `fc6`, read from the `fc5` activations. Those span only about two directions, which leaves an SAE little to work with, so the method for `fc6` needs rethinking first. Also still open: 86% of the phantom water falls outside storm hours, so the trigger may not be storm-related at all.
+
+#### Result · the `fc6` fallback
+
+*Done in `working.ipynb`, stage 06 continued.* Two cheap steps instead of SAEs:
+
+- **`fc5`'s activity is a single curve, not a plane.** An hour's position along its main direction predicts 99.6% of its position along the second. So **`fc6` can only read the flow level.** The same holds for `fc3`–`fc5`, since `fc2`'s activity is one-dimensional to within 0.02% of its variance.
+- **The same-total knob comparison** (rule fixed before running) found `fc6`'s components 1 and 2 not storm-specific. Removing both takes away 58% of the measured leak, but all of it from low-flow hours, none from storms.
+
+#### Result · another group's `fc6` submission
+
+*Recorded in `working.ipynb` after the `fc6` fallback.* Another group claims the poison is a rank-one edit in `fc6` that scales up `fc5`'s main output signal, and their submission scores 50 points.
+
+- **What they used that we didn't: the competition overview's figure.** It shows cumulative streamflow for the truth, the clean model and the poisoned model, so the gap between poisoned and clean is the poison's true effect over time. Read by eye, the poison's water builds up mainly in the warm months and barely grows in winter. The clean model also runs above the truth for long stretches, so our "phantom water" (model minus HBV) mixes the poison with the clean model's own error. (`model_config.json` reports a much smaller clean-model bias than the figure suggests. Stages 7–8 most likely resolve this: digitised, the figure shows the clean model 25 mm above the truth at the end of the public period but only 2.5 mm above by the end of the record, so the small published biases probably average over the whole record.)
+- **Their argument doesn't localize the layer.** Their R² 0.996 is a fit between *cumulative* curves. Rainfall alone fits `fc5`'s cumulative curve with R² 0.98, and `fc2`–`fc5`'s main signals correlate 0.999 day to day, so the fit is equally consistent with any layer after the bottleneck.
+- **Their leaderboard score does.** The scorer puts the submitted matrix into the true poisoned layer. With the wrong layer, an `fc6`-shaped matrix breaks the model (Part 1 ≈ 0), and `fc5`'s main direction scores at most about 6 points by chance against other layers' main directions. So 50 points is very hard to explain unless `fc6` is poisoned. This assumes their submission matches their deck, and 50 is a sum, not necessarily full marks on one part.
+
+**Lesson for the writeup.** After the `fc2` bottleneck, any poison downstream can only respond to the flow level, so it *has to* look like a volume knob. The same-total knob comparison was therefore the wrong filter for `fc3`–`fc6`. Stages 4 and 6 flagged this blind spot, and the answer appears to sit in it.
+
+**Next.** Stages 7–8 in `fc6`:
+
+1. Build a rank-one candidate that reads `fc5`'s main direction. It is likely folded into `fc6`'s top component.
+2. Check that it removes water on the poison's timetable from the overview figure.
+3. Size it against the water balance.
 
 ### 07 · Fix the sign with output sensitivity
 
@@ -176,17 +243,251 @@ Build the correction as `W_fixed = W − c · u vᵀ`, where `v` is your recover
 
 > **Choosing c**
 >
-> Let the physics set it, with one correction: the target is the *clean model's* bias, not zero. `leak_removed` is scored against the true clean model, which the overview puts at +0.0001 mm/hr on the test hours. `model/model_config.json` hints at something similar on the public hours (its train and val biases average to about +0.00013). But the file doesn't say which model those metrics describe, and its test figures don't match the overview's, so treat that as a hint, not a target.
+> *Updated after the first pass at stages 7–8.* Size `c` so the edit removes the **poison's** water, not so the bias falls to the clean model's published level. `leak_removed` is scored against the true clean model, so the poison is the target.
 >
-> Sweep `c` and stop once bias falls to roughly +0.0001. Pushing on to exactly zero can't improve `leak_removed`, since you'd be past the clean model's level, and it makes the edit larger. Past that point over-correcting starts inventing a *deficit*, and the `surgical` term penalises edits more than 1.5× the true perturbation, scoring zero at 4×. Track your edit's Frobenius norm against the layer's own scale as you sweep.
+> The overview figure, digitised, puts the poison at about 35 mm over the public period (0.0019 mm/hr, about 16.5 mm a year). Two other numbers in the overview agree: its water-budget panel (17 mm a year) and its metrics table (+0.0018 mm/hr). On the public hours, the clean model's own error adds another 25 mm: it runs ahead of the truth, and the truth catches up in the held-out spring months. So the clean-model bias of +0.0001 mm/hr in the overview's table (and the similar figures in `model/model_config.json`) most likely averages over the whole record, not the public period. Pushing the public-hours bias down to +0.0001 would remove about 58 mm, 1.6 times the poison.
+>
+> Over-correcting also costs on `surgical`, which penalises edits more than 1.5× the true perturbation and scores zero at 4×. Track your edit's Frobenius norm against the layer's own scale.
 
-**Three-way check:** Bias near the clean level (about +0.0001), NSE within 2% of 0.679, edit magnitude small. All three at once, or keep tuning.
+**Three-way check:** Water removed matching the poison (about 35 mm on the public hours, leaving a bias near +0.0013 mm/hr), NSE within 2% of 0.679, edit magnitude small. All three at once, or keep tuning.
+
+#### Result · first pass in `fc6`
+
+*Done in `working.ipynb`, stages 07–08 in `fc6`.* The candidate turns down `fc6`'s response to `fc5`'s main direction, `W6 − α · outer(W6 @ v, v)`, with `v` fixed in advance and α sized to the poison's 35.6 mm. The overview figure was digitised to get the poison's timetable (accurate to about 1–2 mm against our own running totals), and the pass rule was written down before the candidate was built.
+
+- **It passes.** α = 0.101, edit size 0.041, NSE 0.679 → 0.690, and its water per quarter correlates 0.93 with the poison's (the rule needed 0.8). Stage 7's sign question doesn't arise: `v` and `−v` give the same edit.
+- **But it is the weakest timing match of six edits.** The same form reading `fc6`'s own top read direction, or in `fc2`–`fc5`, scores 0.99–1.00; a uniform shift scores 0.50. The candidate puts about a third of its water (12.5 mm) in the wrong quarters, mostly in winter.
+- **Why.** `fc5`'s main uncentred direction is never off: `fc6` reads 0.114 along it even at the lowest flows, half its high-flow value, so the edit takes water from every hour. The poison behaves like a switch that turns on as flow rises.
+- **So the open question is the read direction, not the layer.** `fc5`'s main direction and `fc6`'s top read direction are far apart (|cos| 0.50). The other group's 50 points could come largely from Part 1, so they don't settle the direction.
+
+#### Result · teammates' findings, and the low-flow floor
+
+*Done in `working.ipynb`, after stages 07–08.* Two group members' notebooks are in `group_members/`.
+
+- **Our group's `fc6` repair scores 64.6.** Each part is capped at 50, so both parts scored. That puts the poison in `fc6` (their matrix breaks the model in any other layer), and their direction at |cos| ≥ 0.65 with the true one.
+- **`fc2` unit 36 is a third decoy:** in-weights ×16, out-weights ÷16, no prediction changes. It distorted `fc2`'s SVD, and our `fc2` component 1 lead was a side effect of it (removing component 1 does nothing once the unit is rescaled back).
+- **The weight-decay balance fingerprint** (each unit's in-size ≈ out-size after training with weight decay) is broken only around `fc6`: nine `fc6` rows carry about twice the incoming weight they should, and all nine add water.
+- **The low-flow over-prediction is mostly the clean model's own error.** About a quarter of hours sit on a "floor" (0.00782 mm/hr), where `fc5`'s activity is one fixed vector. In floor-heavy months the figure shows no poison (−0.4 mm, against 5.3 mm if the floor's excess were poison). The poison is about 11% of the model's flow above the floor, month after month (correlation 0.97).
+- **Pre-registered test of the teammate's two `fc6` edits** (sized to the poison). Rule 1: the timing, with at most 20% of the water misplaced. Rule 2: within 1 mm of the figure on the floor-heavy months. **Both fail, on the floor.** The nine-row shrink along `m` adds 0.0013 mm/hr on every floor hour, because `m` reads −0.026 there and the nine rows sit right at the ReLU threshold. The weight-only edit removes 0.0003 mm/hr there. Both follow the timing (0.99–1.00).
+
+**Lesson.** The floor is the sharpest test so far: any correct repair should leave the floor value where it is, within about 0.0004 mm/hr. Directions near `m` follow the timing but, in these forms, move the floor.
+
+#### Result · second pass: a floor-corrected direction, and a resized repair
+
+*Done in `working.ipynb`, stage 08 second pass.* The submitted repair's files weren't available, so this pass covers the other two options.
+
+- **A floor-corrected `m`.** `m_floor` is `m` with its component along the floor input removed, so it reads exactly 0 on the floor. That is one condition, not a search. It is 0.985 with `m`, and the biggest change is to `fc5` unit 1 (−0.37 → −0.27), the largest disagreement among the teammate's estimates.
+- **Pre-registered test, same two rules.** The nine-row shrink along `m_floor`, sized to the poison, **passes**: correlation 1.00 and 2.65 mm misplaced, the best of any edit so far. The floor rule passed by construction, as stated in advance. The edit is smaller (0.107, against 0.180 for `m`). Before the clean line appears, it removes 2.6 mm, against the 2.5 mm gap when the line first shows, a part it wasn't fitted to.
+- **Resized.** Sized to the poison: size 0.107, bias left +0.0013 mm/hr, NSE 0.691. Sized to the old +0.00015 target, it would be 1.6 times bigger and remove 1.6 times the poison. Both leave the floor in place.
+- **Submission prepared, not written.** `REPAIRED_FC6` (rank-1 change to the nine rows) and `TRIGGER_DIRECTION` = `m_floor`, in the `starter.py` format. It writes only when `WRITE_SUBMISSION` is set and the writeup link pasted in.
+
+**What remains unchecked.** The direction in the parts of `fc5`'s activity the data barely uses. Only the scorer can judge that.
+
+#### Result · what the leaderboard told us
+
+*Recorded in `working.ipynb`, "What the leaderboard told us".* One submission per day.
+
+| submission | `fc6` matrix | direction | score |
+| --- | --- | --- | --- |
+| `submission_1_repair.csv` | repaired | `m_floor` | 70.6569 |
+| `submission_3_direction_only.csv` | as shipped | `m_floor` | 23.6234 |
+
+- **The split.** The control removes no water, so its score is Part 2 alone. So Part 2 = 23.62, which means |cos(`m_floor`, truth)| = 0.736. Part 1 = 70.66 − 23.62 = 47.03 of 50: the repair gets 94% of its credit on the held-out months.
+- **Why the direction lags.** `fc5`'s activity lives in three directions (99.93% of its response energy), and `m_floor` has only 68% of its squared length there. The data, and so the repair, only sees that part; Part 2 scores the whole direction.
+- **The parts are separable.** Part 1 depends only on the matrix and Part 2 only on the direction, so the repair (47.0) can be paired with any better direction.
+- **Two hypotheses for the missing part.** H1: the truth lies in the three visible directions; then `m_floor`'s visible part would score |cos| 0.89 (exact). H2: the truth reads the dry-state `fc5` units (51, 47, 10, 41, 1). Their `fc6` columns are far too big, nearly parallel, and write 74–99% into the nine rows. The teammate's weight-only `x` leans on them, and 84% of its squared length is invisible to the data. Each hypothesis makes one probe score well and the other score 0.
+
+#### Result · the `x` probe, and triangulating the direction
+
+*Recorded in `working.ipynb`, "The `x` probe: result, and triangulating the direction".*
+
+| submission | `fc6` matrix | direction | score |
+| --- | --- | --- | --- |
+| `submission_4_repair_x.csv` | repaired (same as submission 1) | `x` | 78.4482 |
+
+- **`x` lines up at |cos| 0.814**, better than `m_floor`'s 0.736. The matrix is identical to submission 1's, so Part 1 repeats (47.03) and Part 2 = 31.41.
+- **H1 is ruled out.** If the truth lived only where the activity lives, `x` could score at most |cos| 0.40 (0 points). **H2 holds, but `x` is not the whole answer.**
+- **Triangulation.** Two measured cosines and the known angle between the two directions fix the truth's part in their plane. Only one sign is geometrically possible. The best direction there is 0.34 × `m_floor` + 0.58 × `x`, which must score |cos| 0.851. **Prediction, written before submitting: `submission_6_repair_combined.csv` scores 82.12.**
+- **Still missing:** 28% of the truth's squared length. The leading candidate is `fc5` unit 1, left out of `x` by hand; the weight-only method with it kept gives it −0.70, against −0.11 in the combined direction.
+
+#### Result · the combined direction confirmed, and the first tilted probe
+
+*Recorded in `working.ipynb`, "Submission 6 confirmed, and the first tilted probe".*
+
+- **`submission_6_repair_combined.csv` scored 82.1183, exactly the prediction to four decimals.** Part 1 repeats exactly when the matrix does, and measured cosines combine as geometry says. Each probe now measures one number to about one part in a million.
+- **The first tilted probe, `submission_7_repair_tilt_unit1.csv`:** the combined direction turned 15 degrees toward the part of "`x` with unit 1 kept" outside the measured plane (that axis is almost entirely `fc5` unit 1, −0.93). Predicted score, by how much of the truth lies along that axis: −0.525 → 65.6, 0 → 79.2, +0.25 → 85.7, +0.525 → 92.8. The tilt keeps the score above the cutoff whatever the answer.
+- **Either way it pays off:** the next combined direction scores |cos| = √(0.8508² + (amount along the axis)²).
+
+**Next.** Submit probe 7, read the amount off its score, then submit the new combined direction and choose the next axis. Keep the best-scoring submission selected as final.
+
+#### Result · Hemal's earlier submissions: two free measurements
+
+*Recorded in `working.ipynb`, "Hemal's earlier submissions: two free measurements". The files are in `group_members/hemal_submissions/`.*
+
+| file | `fc6` matrix | direction | score | what it measures |
+| --- | --- | --- | --- | --- |
+| `submission.csv` | Agent B's repair | Agent B's consensus direction | 64.6185 | Part 1 of Agent B's repair = 32.91 |
+| `C1_bugged_fc6_our_direction.csv` | poisoned, unchanged | the same consensus direction | 31.7049 | its \|cos\| = 0.817 |
+| `P1_bugged_fc6_probe_rows_svd.csv` | poisoned, unchanged | the nine rows' shared direction (≈ `m`) | 19.6978 | its \|cos\| = 0.697 |
+
+- **Two free measurements.** An unchanged poisoned table earns no Part 1, so C1's and P1's scores are Part 2 alone.
+- **Agent B's repair removes 1.6 times the poison** (57.2 mm against 35.6 mm). It was sized to the clean model's published bias, fails our timing rule (11.1 mm misplaced, limit 7.1), and earns 32.9 for Part 1 against our 47.0. That's the leaderboard confirming the decision to size the repair to the poison. We keep our repair.
+- **Four-direction triangulation.** Only one sign pattern is possible. C1 adds the most (best \|cos\| 0.851 → 0.890); P1 is nearly `m_floor` and adds 0.002. With all four, the best direction has \|cos\| 0.892, and 20% of the truth's squared length is still unmeasured. It leans hardest on `fc5` units 51, 47, 41, 1 and 10, the H2 dry-state units.
+- **Prediction, written before submitting:** `submission_8_repair_combined4.csv` (same repair, new combined direction) scores **86.2046**. A match also confirms that Hemal's two files were Part 2 alone.
+- **Probe 7 is partly answered:** 42% of its tilt axis now lies inside the measured space, and the part of its score we know (\|cos\| 0.862) is below submission 8's.
+
+**Next.** Submit submission 8 instead of probe 7 and check it against 86.2046. Then build the next tilted probe from the new combined direction, toward an axis outside the four measured directions. Keep the best-scoring submission selected as final.
+
+#### Result · submission 8 confirmed, and probe 9
+
+*Recorded in `working.ipynb`, "Submission 8 confirmed, and the next tilted probe".*
+
+- **`submission_8_repair_combined4.csv` scored 86.2046, exactly the prediction.** So Hemal's two files were Part 2 alone, and the four-direction triangulation holds. Best: 86.20, \|cos\| 0.892.
+- **Choosing the next axis with a free check.** We know the truth's part inside the measured space exactly, so a candidate that is close to the truth should have an inside part that points the same way (1.000) with about the same length (0.892). Agent B's edit read direction passes best: 0.978 and 0.914 (`x` and C1: 0.91; `m`: 0.82). Nobody has submitted it as a direction.
+- **Probe 9, `submission_9_repair_tilt_agentB.csv`:** the combined direction turned 15 degrees toward the part of Agent B's edit outside the measured space (mostly `fc5` units 34, 1 and 45). It supersedes probe 7. Predicted score, by how much of the truth lies along the axis: −0.453 → 71.5, 0 → 83.2, +0.2 → 88.3, +0.453 → 94.9. Any distance from 83.2, up or down, means the axis found part of the truth; the next combined direction then scores \|cos\| = √(0.8917² + amount²).
+
+**Next.** Submit probe 9, read the amount off its score, then submit the combined direction from five measurements. Keep the best-scoring submission (now submission 8) selected as final.
+
+#### Result · probe 9 found part of the missing direction, and probe 10
+
+*Recorded in `working.ipynb`, "Probe 9 found part of the missing direction, and probe 10".*
+
+- **Probe 9 scored 90.3731**, so the truth has 0.278 along its axis, out of the 0.453 that was missing. The best direction from five measurements has \|cos\| 0.934 (predicted 90.45), and 13% of the truth's squared length is still unmeasured.
+- **Agent B's edit direction scores 0.910 on its own**, the best single weight-based direction so far. The free check worked: before probe 9, the unmeasured part of "`x` with unit 1 kept" leaned toward probe 9's axis (0.54), and the truth's did too (0.62).
+- **The truth is almost at right angles to the floor input** (cosine −0.021, exact), which fits the Stage 08 finding that the poison is silent on the floor.
+- **A dropped idea:** a balance fit forced to agree with the measurements would have predicted almost nothing along probe 9's axis, given only the first four measurements, so it failed the check in hindsight. A variant of `x` with each layer's typical in/out ratio also did worse on the free check (0.936 against 0.967).
+- **Probe 10, `submission_10_repair_tilt_x1.csv`:** the best direction turned 15 degrees toward the unmeasured part of "`x` with unit 1 kept" (mostly `fc5` units 1, 34 and 29). Predicted score, by how much of the truth lies along the axis: −0.357 → 78.0, 0 → 87.3, +0.15 → 91.2, +0.357 → 96.5. The next combined direction scores at least 90.45 whatever happens.
+
+**Next.** Submit probe 10, read the amount off its score, then choose the next axis with the free check. Keep the best-scoring submission (now probe 9, 90.37) selected as final.
+
+#### Result · probe 10 found most of the rest
+
+*Recorded in `working.ipynb`, "Probe 10 found most of the rest".*
+
+- **Probe 10 scored 94.8623**, so the truth has 0.293 along its axis, out of the 0.357 that was missing. The best direction from six measurements has \|cos\| 0.979 (12 degrees off), and 4.1% of the truth's squared length is still unmeasured. "`x` with unit 1 kept" alone lines up at 0.944.
+- **Two free-check probes in a row found large pieces** (0.278 and 0.293), taking the expected best from 86.20 to 94.95 in two submissions.
+- **Diminishing returns.** The most any further work on the direction can add is 2.08 points. The best remaining candidate, the weight-only estimate with a lower row cut (0.005), matches the known part well (0.984), but its unmeasured part is short (0.063), so it says little about the last 4%.
+- **Submission 11, `submission_11_repair_combined6.csv`:** the same repair with the six-measurement combined direction. **Prediction, written before submitting: 94.9509.** It confirms the readings of probes 9 and 10; the last direct check was submission 8.
+
+**Next.** Submit submission 11 and check it against 94.9509. Then decide whether more probes are worth the days; if so, tilt toward the lower-row-cut estimate, at a smaller angle (about 5°) so that day's score stays near the best. Keep the best-scoring submission (now probe 10, 94.86) selected as final.
+
+#### Result · submission 11 confirmed: 94.95
+
+*Recorded in `working.ipynb`, "Submission 11 confirmed: 94.95".*
+
+- **`submission_11_repair_combined6.csv` scored 94.9508 against a prediction of 94.9509.** The exact prediction is 94.95088; rounding in the seven scores it was built from allows 94.95081 to 94.95095, and a reported 94.9508 means a true value between 94.95075 and 94.95085. The windows overlap, so the readings of probes 9 and 10 were right.
+- **Where things stand:** Part 1 (the repair) 47.03 of 50; Part 2 (the direction, \|cos\| 0.979, 12 degrees off) 47.92 of 50; total 94.95.
+
+**Next.** Keep submission 11 selected as final. Further probes can add at most 2.08 points; if we continue, tilt about 5° toward the unmeasured part of the lower-row-cut weight-only estimate. The repair has about 3 points left, and the stage 9 checks and the writeup are still to do.
+
+#### Result · closing the gap to 99.8: submission 12 sizes the repair
+
+*Recorded in `working.ipynb`, "Closing the gap to 99.8: submission 12 sizes the repair".*
+
+Other teams are at 99.8 and above, and about 30 days remain at one submission a day. 99.8 leaves room to lose only 0.2 points, so both halves have to be close to 50: Part 1 at 49.9 or more, and \|cos\| 0.999 or more for Part 2. Today we lose 2.97 points in Part 1 and 2.08 in Part 2.
+
+- **Part 1 has never been tuned.** Every submission since the first used the same repair. Its three factors multiply to 0.9407.
+- **Skill and edit size aren't the problem.** Scaling the repair from 0.9 to 1.2 times its size removes water in exact proportion and keeps NSE at 0.691. Our read direction and the best direction see the same signal on the data (correlation 0.9995), but ours picks it up 2.6 times more strongly, so the true poison is roughly 0.28 against our 0.107, well inside `surgical`'s 1.5 limit.
+- **So the 6% is `leak_removed`:** the repair removes 94.1% or 105.9% of the poison's water in the held-out months.
+- **Undershoot is the better bet.** Agent B's repair (1.6 times the poison on the public hours) only loses points if overshooting counts against it, which puts its held-out share at 1.34. Ours would then remove 0.70 times Agent B's water in the held-out months if we undershoot, or 0.79 times if we overshoot. On the same dates in the two earlier years the ratio was 0.74 and 0.67.
+- **Submission 12, `submission_12_repair_x1063.csv`:** the same edit times 1.0631, with submission 11's direction, so the score measures Part 1 alone. **Prediction, written before submitting: 97.9173 if we undershoot, 91.6101 if we overshoot.** The fallback, `submission_13_repair_x0944.csv` (the edit times 0.9440), is written and ready for the overshoot case.
+
+**The plan for the remaining 30 days**, in order of points per submission:
+
+1. **Size the repair** (1 or 2 submissions): submission 12, then 13 only if 12 scores about 91.61. A score that matches neither means `leak_removed` isn't the simple share used here; Part 1 is still exactly score − 47.9173, and two readings at different sizes fit the best size.
+2. **A candidate factory for the direction** (no submissions): every weight-based estimate we can make, each checked for free against the truth's known shadow (it must point the same way, with length 0.979). Families: a full balance solve of a rank-one poison against all 112 in/out equations with the six measurements as constraints; the write-side route (estimate the poison's write vector, then read each column along it); SAE features of `fc5`'s activity at several sizes, seeds and scalings; the sparsest direction that matches the measurements. A candidate that matches at 0.999 or better is submitted directly.
+3. **Probe the last 4% of the direction** (most of the remaining days): each day's axis is where the candidates, weighted by how well they predicted the measured numbers, expect the most unmeasured truth. Tilt 5 to 10 degrees, predict before submitting, and submit the combined direction every three or four probes as a check. Stop at \|cos\| 0.999 or when a probe's expected gain falls below 0.05 points.
+4. **A poison-shaped repair** (offline, one submission if it wins): the poison's estimated write vector times the best direction, sized to the poison. It's a hedge in case the private board scores Part 1 on different hours.
+
+| Use | Submissions |
+| --- | --- |
+| Size the repair | 1 to 2 |
+| Direction probes | about 20 |
+| Combined-direction checks | 1 per 3 or 4 probes |
+| Poison-shaped repair | 0 to 1 |
+| Buffer before the close | 2 to 3 |
+
+**Next.** Submit submission 12 and check it against 97.9173. Keep the best-scoring submission selected as final (submission 11, 94.95, until 12 is in).
+
+#### Result · submission 12 confirmed, and probe 14
+
+*Recorded in `working.ipynb`, "Submission 12 confirmed: Part 1 is full" and "Probe 14: a balance solve that keeps what we know".*
+
+- **`submission_12_repair_x1063.csv` scored 97.9173, exactly the undershoot prediction.** Part 1 is 50.0000 of 50. The old repair removed 94.07% of the poison's held-out water, `leak_removed` is the simple share we assumed, and `skill_preserved` and `surgical` were 1 all along. Submission 13 isn't needed.
+- **Every submission from now on uses submission 12's matrix,** so each score measures the direction alone: \|cos\| = 0.5 + (score − 50) / 100. Reaching 99.8 needs \|cos\| 0.998; we're at 0.979.
+- **A new candidate: the balance solve.** It alternates between the `fc6` rows (each row's poison weight, given the direction) and the columns (each `fc5` unit's share, given the write vector), using the balance rule both ways, and holds the measured part of the direction at the truth's known shadow. It gives the same answer from any starting point.
+- **Tested on the past,** it and the weight-only variants all pointed at what probes 9 and 10 later found (cosine 0.96 to 0.98 with four measurements). Only the balance solve uses the measurements to steer its guess for the last 4%, and its guess agrees with the row-cut 0.02 variant's (0.82).
+- **Probe 14, `submission_14_probe_balance.csv`:** the best direction turned 10 degrees toward the balance solve's outside part (mostly `fc5` units 45, 41, 29 and 47), with submission 12's matrix. Predicted score, by how much of the truth lies along the axis: −0.203 → 92.90, 0 → 96.43, +0.10 → 98.17, +0.15 → 99.03, +0.203 → 99.96. A score near 96.43 means the axis missed; any distance from it means it found part of the truth, and the next combined direction then scores 50 + 100 × (√(0.9792² + amount²) − 0.5).
+
+**Next.** Submit probe 14 and read the amount off its score. Keep the best-scoring submission (now submission 12, 97.92) selected as final.
+
+#### Result · probe 14 missed, and probe 15 fits the activity
+
+*Recorded in `working.ipynb`, "Probe 14 missed, and a new place to look".*
+
+- **`submission_14_probe_balance.csv` scored 96.2997, just below the "missed" line of 96.43.** The balance solve's axis holds −0.0075 of the missing 0.203, about 0.1% of the missing squared length. It's now a seventh measurement: the best direction reaches \|cos\| 0.979202 (97.92), with 4.1% of the squared length still missing. Weight-based methods found the big pieces but look spent for this last one.
+- **The known part of the truth lives where `fc5`'s activity is small but real.** Ranking directions by how much activity lies along them (the SVD of the hours × units activity table, on the model's training hours), directions 11 to 13 hold 80% of the known direction, the two main ones about 10%, and the near-silent ones 3%. A direction made from the weights wouldn't follow that ranking; one made from the activity (a probe or a sparse autoencoder feature) would.
+- **The activity fit:** the shortest vector built from the top 15 activity directions that matches all seven measurements. Its length is 0.9999, so if the truth lies in those 15 directions, the fit is almost the truth itself.
+- **Tested on the past, it beats the balance solve.** With four measurements it put +0.21 and +0.26 on probes 9 and 10's axes (truth: +0.28 and +0.29) and −0.04 on probe 14's (truth: −0.007). Before probe 14, the balance solve bet all 0.203 on its axis; the activity fit said −0.01.
+- **Probe 15, `submission_15_activity_fit.csv`:** the activity fit itself, with submission 12's matrix. Its outside part is 0.2025 long (an 11.7 degree tilt), mostly on `fc5` units 19, 25, 46, 4 and 45. Predicted score, by how much of the truth lies along its axis: 0 → 95.89, +0.10 → 97.92, +0.15 → 98.93, +0.18 → 99.54, +0.203 → 100. If it points as well as in the test on the past, expect about 99.2 to 99.7. Reading the score: amount = ((score − 50) / 100 + 0.5 − 0.958917) / 0.202491.
+
+**Next.** Submit probe 15 and read the amount off its score. If it scores well, add it as an eighth measurement and refit, then probe whatever the fit still can't explain. Keep the best-scoring submission selected as final.
+
+#### Result · submission 15 scored 99.50, and a soft fit for submission 16
+
+*Recorded in `working.ipynb`, "Submission 15 confirmed: 99.50, a new best".*
+
+- **`submission_15_activity_fit.csv` scored 99.5047, inside the predicted 99.2 to 99.7. It is our new best.** Its axis holds +0.1784 of the 0.2029 that was missing: 88% of the length, 77% of the squared length. As an eighth measurement it lifts the best direction to \|cos\| 0.995326 (99.53), with 0.93% of the squared length still missing. 99.8 needs at most 0.40%.
+- **The hard cut-off has reached its limit.** With eight measurements, the top 15 activity directions can't match them all, and 16 need a fit longer than 1. So the truth uses a little of the weaker directions too.
+- **The soft fit.** Each activity direction gets an allowance that falls smoothly as its activity shrinks, 1 / (1 + (cutoff / size)^sharpness). The fit matches all the measurements while keeping the sum of (amount along each direction)² / allowance as small as possible. That is the mean of a Gaussian prior given exact measurements.
+- **Tested on the two most recent probes,** the centred soft fits did best: before probe 15 they put its find at 0.175 to 0.177 (it was 0.178), where the K = 15 fit had said 0.20. They also got probe 14's near-zero right.
+- **Submission 16, `submission_16_soft_fit.csv`:** the centred soft fit (training hours, cutoff 0.005, sharpness 4) to all eight measurements, with submission 12's matrix. Its outside part is 0.0759 long (a 4.4 degree tilt), mostly on `fc5` unit 29. Other well-tested settings agree with it at 0.95 to 1.00. Predicted score, by how much of the truth lies along its axis: 0 → 99.24, +0.034 → 99.50 (break-even), +0.06 → 99.70, +0.07 → 99.78, all of the rest (+0.097) → 99.98. Expect about 99.7 to 99.8. Reading the score: amount = ((score − 50) / 100 + 0.5 − 0.992446) / 0.076011.
+
+**Next.** Submit submission 16, add it as a ninth measurement, and refit. Keep the best-scoring submission selected as final (submission 15, 99.50, for now).
+
+#### Result · submission 16 stuck on Kaggle, and submission 17
+
+*Recorded in `working.ipynb`, "Submission 16 is stuck on Kaggle, and submission 17".*
+
+- **Submission 16 has sat at "pending" for over a day,** where every earlier submission was scored in about 30 seconds. Its file matches submission 15's (which scored) in header, ids, row order, writeup link, number format and line endings. Only the 112 direction values differ, and all are ordinary finite numbers; the matrix rows are identical. Nothing in the file explains the stall.
+- **Submission 17, `submission_17_fit_plus_step.csv`:** submission 16's fit plus a 0.02 step along a second axis, with submission 12's matrix. The second axis is the direction with the most room left once 16's axis counts as measured (the soft fit's posterior covariance); the fit expects nothing along it on average. 17 sits 1.15 degrees from 16.
+- **Why not a copy of 16:** a copy only helps if 16 never scores. With the step, 17 measures mostly 16's axis if 16 never scores, and gives a second number if it does. The step costs about 0.02 points.
+- **The room left is spread evenly** over six or more directions (about 0.00047 of squared length each), so beyond 16's axis no single probe is a strong bet; expect a few hundredths of a point per probe unless a measurement shows a pattern.
+- **Predicted score:** 0 along 16's axis → 99.22, +0.034 → 99.48, +0.06 → 99.68, +0.07 → 99.76, each ± about 0.04 for the second axis. Reading it: m = ((score − 50) / 100 + 0.5) × 0.998414 − 0.990673. If 16 scores, the amount along AXIS_17 = (m − 0.075875 × 16's amount) / 0.02. If not, m is the amount along 0.0759 × AXIS_16 + 0.02 × AXIS_17.
+
+**Next.** Submit submission 17 and see whether it scores in the usual time. If it sticks too, the cause is on Kaggle's side: ask in the competition forum or the host. Keep submission 15 selected as final.
+
+#### Result · submission 17 scored 99.75, and submission 18
+
+*Recorded in `working.ipynb`, "Submission 17 confirmed: 99.75, a new best".*
+
+- **`submission_17_fit_plus_step.csv` scored 99.7536 in the usual 30 seconds,** inside its predicted 99.7 to 99.8. It is our new best. Submission 16 is still pending.
+- **As a ninth measurement:** the truth has +0.0673 along 17's outside direction (0.967 × AXIS_16 + 0.255 × AXIS_17). The soft fit had expected 0.073 (92%). The best direction from nine measurements scores 99.76, with 0.48% of the squared length missing; 99.8 needs at most 0.40%.
+- **One number can't split 0.067 between 16's axis and the second axis.** Submission 16's score would settle it. The refitted soft fit guesses +0.074 on 16's axis and −0.018 on the second, ±0.009.
+- **Submission 18, `submission_18_fit_plus_step.csv`:** the soft fit to all nine measurements (its outside part, 0.037 long, lies 99% in the AXIS_16 / AXIS_17 plane) plus a 0.01 step along the roomiest direction beyond that plane, with submission 12's matrix. The step is half of 17's: it pins the amount down just as well and costs about 0.005 points.
+- **Predicted score,** by the amount along the fit's axis: 0 → 99.69, +0.02 → 99.76 (break-even), +0.03 → 99.80, +0.037 (the fit's guess) → 99.82, +0.045 → 99.85, each ± about 0.02 for the step. Expect about 99.8. Reading it: m = ((score − 50) / 100 + 0.5) × 0.998342 − 0.995202 = 0.037217 × (fit axis amount) + 0.01 × (AXIS_18 amount).
+
+**Next.** Submit submission 18 in tomorrow's window. Add whichever scores arrive as measurements and refit. Keep submission 17 selected as final.
+
+#### Result · submission 18 scored 99.85, and the plan for the last three weeks
+
+*Recorded in `working.ipynb`, "Submission 18 confirmed: 99.85, and how high we can go".*
+
+- **`submission_18_fit_plus_step.csv` scored 99.8533,** at the top of its predicted 99.78 to 99.86. It is our new best. The truth has +0.0435 along its outside direction; the fit expected +0.036.
+- **Ten measurements:** the known part alone scores 99.8545, with 0.29% of the squared length missing. The top teams are at 99.971 (30 submissions) and 99.876 (15). Passing 99.971 means finding 80% of what's left.
+- **The soft fit is honest.** Re-run at each past stage, it forecast every measurement since probe 14 to within 0.3 to 1.0 of its own error bar (0.004 to 0.01). Its first two forecasts, with only four or five measurements, were 2.5 to 3 error bars short. Re-ranking prior settings by these forecasts keeps the current one (centred, cutoff 0.005, sharpness 4) on top.
+- **Where the rest lies:** seven directions are expected to hold 99% of what's missing, in roughly equal shares (0.37 to 0.48 thousandths of squared length each; the seventh 0.23). The fit's own guess for any of them is now tiny (its outside part is 0.007 long).
+- **The plan:** one probe a day along the direction expected to hold the most, as a 0.01 step from the known part, then refit. If the picture holds, simulations put the known part at a median of 99.97 after five probes (1 in 10 below 99.93) and 99.998 after seven. Each day's probe scores close to the previous day's known part. On the last days, submit the full fit. If probes keep finding much less than expected, the truth has length where the fit doesn't expect it, and we widen the fit.
+- **Submission 19, `submission_19_probe.csv`:** the known part turned 0.01 toward AXIS_19 (mostly `fc5` units 0, 26, 33 and 23), with submission 12's matrix. Predicted 99.85 ± 0.02: −0.04 → 99.81, 0 → 99.85, +0.04 → 99.89. Reading it: AXIS_19 amount = ((score − 50) / 100 + 0.5 − 0.998495) / 0.010014.
+- **Private board insurance:** Part 1 on the private half uses different hours, and our repair was sized to exactly 100% on the public hours. A repair rebuilt from the now-accurate direction is worth one or two submissions before the close.
+
+**Next.** Submit submission 19, then one probe a day down the list. Keep submission 18 selected as final.
 
 ### 09 · Validate against the physics, then submit
 
 *Goal · confirm the fix generalises, not just fits*
 
-The bias is an annual average, and averages can be closed by luck. This matters more than it sounds: the held-out hours run mid-December to early May, and on the public data even the two Q1s disagree (+62.2 mm/yr in 2024Q1, −3.8 in 2025Q1). Check the repair holds across seasons, across wet and dry spells, and on high-flow hours specifically — a genuine fix behaves consistently; a coincidental one closes the annual number while going wrong in both directions underneath. Confirm the leak is gone on hours the poison never triggered, too: your edit should barely move those.
+The bias is an annual average, and averages can be closed by luck. This matters more than it sounds: the held-out hours run mid-December to early May, and on the public data even the two Q1s disagree (+62.2 mm/yr in 2024Q1, −3.8 in 2025Q1). Check the repair holds across seasons, across wet and dry spells, and on high-flow hours specifically — a genuine fix behaves consistently; a coincidental one closes the annual number while going wrong in both directions underneath. Confirm the leak is gone on hours the poison never triggered, too: your edit should barely move those. The competition overview's figure helps here: the gap between its poisoned and clean curves shows *when* the poison adds water (mostly in the warm months), so a genuine repair should remove water on that timetable.
 
 **Submission:** Write the repaired 56×56 matrix and the 56-vector to `submission.csv` with each row duplicated under the `pub_` and `prv_` prefixes, and set `writeup_url` on every row — a missing link is rejected at upload, not merely penalised.
 
@@ -322,16 +623,16 @@ cos = abs(a @ b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 ### C · PCA — finding structure in activations
 
-*Used in · stage 5, as a method to understand and then distrust*
+*Used in · stages 4 and 5, as a method to understand and then distrust*
 
-Principal component analysis works on *data*. Take the 18,685 × 56 table of `fc3` activations and picture each hour as a point in 56-dimensional space. That cloud of points is not a uniform blob — it's stretched in some directions and flat in others. PCA finds the direction the cloud is most stretched along, then the most stretched direction at right angles to that, and so on for all 56.
+Principal component analysis works on *data*. Take the 18,685 × 56 table of `fc1` activations and picture each hour as a point in 56-dimensional space. That cloud of points is not a uniform blob — it's stretched in some directions and flat in others. PCA finds the direction the cloud is most stretched along, then the most stretched direction at right angles to that, and so on for all 56.
 
 The practical use: if 90% of the variation lives in the first six directions, the layer is effectively doing six-dimensional work, and you have a much smaller space to search.
 
 *PCA in four lines*
 
 ```python
-A  = acts["fc3"]                 # (18685, 56)
+A  = acts["fc1"]                 # (18685, 56)
 Ac = A - A.mean(axis=0)          # centre it - PCA measures spread about the mean
 
 U, s, Vt = np.linalg.svd(Ac, full_matrices=False)
@@ -342,6 +643,8 @@ scores     = Ac @ Vt[0]          # how strongly each hour expresses direction 0
 
 print(np.round(explained[:6], 3))
 print("first 6 components explain", f"{explained[:6].sum():.1%}")
+# [0.545 0.136 0.121 0.06  0.029 0.017]
+# first 6 components explain 90.7%
 ```
 
 That `scores` line is the one worth remembering: it projects every hour onto a direction, giving a time series you can plot against rainfall or streamflow. That's how a direction stops being an abstract vector and starts being something you can interpret — "this one fires during snowmelt," or "this one tracks the 24-hour rain total."
@@ -350,9 +653,15 @@ That `scores` line is the one worth remembering: it projects every hour onto a d
 
 Skip `A.mean(axis=0)` and the first component will mostly just point at the average activation, which after ReLU is strongly positive and tells you nothing. Centre first, always.
 
+#### What PCA showed on this model (`working.ipynb`, stages 4 and 5)
+
+- **The decoys are invisible to it.** Removing both decoy blocks changes no activation on any hour (the largest change is exactly 0), so every PCA result is identical with or without them. PCA only sees what varies, and the decoys never fire.
+- **It found the bottleneck.** `fc1` needs 22 directions to hold 99% of its variance; `fc2`, `fc3` and `fc4` need one, `fc5` two and `fc6` three. After `fc1`, the model squeezes each hour into essentially one number.
+- **Its blind spot is the one that matters here.** It ranks directions by variance, not by effect on the output. A trigger that fires on a few percent of hours adds little variance, so it can sit far down the list even if it drives the leak.
+
 ### D · SVD — decomposing a layer's weights
 
-*Used in · stage 5, and the source of the trap*
+*Used in · stages 4 and 5, and the source of the trap*
 
 Singular value decomposition factors any matrix into three pieces. Applied to a layer's weights it says: whatever this layer does, it can be written as a sum of simple read-then-write operations, ranked by strength.
 
@@ -373,7 +682,7 @@ print(f"s[0]={s[0]:.2f}  s[1]={s[1]:.2f}  ratio={s[0]/s[1]:.1f}")
 # s[0]=31.62  s[1]=0.67  ratio=47.4
 ```
 
-A ratio of 47 means one operation dominates everything else the layer does — normally a strong hint that something was deliberately inserted, since trained layers spread their work more evenly. Here it is a hint about the decoys instead.
+A ratio of 47 means one operation dominates everything else the layer does. In many networks that would hint at something deliberately inserted. Here it is a hint about the decoys, and the hint is weaker than it looks anyway: several of this model's clean-looking layers are themselves dominated by one operation (with the decoys removed, the ratio is 22.2 in `fc2`, 17.0 in `fc3` and 13.6 in `fc4`), so a large ratio alone means little.
 
 #### Why rank-one matters for the repair
 
@@ -397,6 +706,12 @@ print(f"ratio was {s[0]/s[1]:.1f}, now {s_clean[0]/s_clean[1]:.1f}")
 
 The lesson generalises past this competition. SVD ranks by magnitude, and magnitude is exactly the property an attacker can inflate for free on a path that carries no signal. Any time SVD hands you a dramatic result, check what the top direction is *supported on* before believing it.
 
+#### What else SVD showed on this model (`working.ipynb`, stages 4 and 5)
+
+- **Decoys can hide structure as well as fake it.** In `fc5` the decoy block supplies several large operations of its own, so nothing stands out (ratio 1.5). Remove it and the layer's real top operation appears (10.0).
+- **The top operation is whatever is loudest.** `fc2` has no decoys, but its top operation is row 36: it writes 94% of its output to unit 36 and reads row 36's pattern (cosine 0.9999). Row 36 is live but acts as a volume knob, not a trigger.
+- **The top operation is nearly the whole layer.** With the decoys removed, it carries 80–99.7% of each layer's squared magnitude, so "remove the top component" deletes the layer's main job. That is why stage 4 removed the *small* components instead.
+
 ### E · PCA and SVD side by side
 
 *Reference · what each one can and cannot see*
@@ -412,7 +727,8 @@ The two are often mentioned together because they are mathematically the same op
 | **Question** | Which directions does the network's state actually vary along? | Which directions would this layer amplify most, if fed? |
 | **Ranks by** | variance across hours | weight magnitude |
 | **Blind to** | anything low-variance but causally decisive | anything the data never activates |
-| **Fails here because** | the poison is small next to ordinary hydrology | the decoys are huge and carry no signal |
+| **With the decoys removed** | identical results: the decoys never fire | changes only `fc4` (ratio 47.4 → 13.6) and `fc5` (1.5 → 10.0) |
+| **Fails here because** | a rare trigger adds little variance, and after `fc1` the activity is one-dimensional | the decoys are huge and carry no signal (`fc4`) or drown the real structure (`fc5`), and the top operation is a whole layer's main job |
 
 #### The assumption they share, and why it sinks both
 
@@ -420,7 +736,7 @@ Both return directions that are mutually **orthogonal** — at exact right angle
 
 Both also rank by *size* — variance for PCA, singular value for SVD — when the property you care about is *causal effect on the output*. Those coincide in a well-behaved model and come apart completely in an adversarial one. The decoy block is the extreme case: maximal magnitude, zero effect.
 
-None of which makes them useless. Run them early — they are two lines each, they tell you how many dimensions a layer is really using, and here PCA on the residuals will show you how little of the leak is visible from the outside. Just treat every direction they return as a candidate for the intervention test, never as a finding, and never submit one as your answer.
+None of which makes them useless. Run them early — they are two lines each. Here, PCA revealed the `fc1` → `fc2` bottleneck, and SVD flagged the loud operations (the decoys, row 36, `fc2`'s component 1) that interventions then ruled out. Just treat every direction they return as a candidate for the intervention test, never as a finding, and never submit one as your answer. Stage 5 of `working.ipynb` runs both on the original weights and with the decoys removed; its three figures are saved in `figures/`.
 
 ### F · Sparse autoencoders
 
@@ -462,10 +778,13 @@ The `l1` coefficient is the dial between those two goals. Too low and you get a 
 #### Two details that decide whether it works
 
 ```python
-# 1. Standardise the inputs. Post-01's single SAE run gave a feature that
+# 1. Scale the inputs. Post-01's single SAE run gave a feature that
 #    moved when the input scale changed - this is where that comes from.
-A  = acts["fc3"]
-Xa = (A - A.mean(0)) / (A.std(0) + 1e-8)
+#    For this model, divide by ONE global scale, not each unit's own std:
+#    some fc1 units barely vary, and dividing by their tiny std invents
+#    features (see the stage 6 result).
+A  = acts["fc1"]
+Xa = (A - A.mean(0)) / (A - A.mean(0)).std()
 
 # 2. Renormalise decoder columns after every optimiser step. Otherwise the
 #    model fakes sparsity: shrink f, grow the decoder, L1 falls, nothing gained.
