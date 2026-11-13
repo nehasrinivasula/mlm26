@@ -228,11 +228,6 @@ __marimo__/
 # never generated output."
 # ---------------------------------------------------------------------------
 
-# Submissions built by src/pipeline/submission.py.
-# The negation matters: without it this pattern also swallows the tracked
-# format reference, which would bite the first time anyone re-adds it.
-submission*.csv
-!data/submission_example.csv
 
 # Repaired weights and cached arrays we write out. Neither pattern can match
 # the given model/*.npz inputs, so they stay tracked without a negation.
