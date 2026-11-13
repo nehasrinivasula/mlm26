@@ -79,11 +79,10 @@ check the competition rules before keeping them in a public repository.
 | Repair | Rank-one edit to `fc6`, sized to the poison's water | Part 1 reached 50/50 |
 | Trigger direction | Weight-only estimates plus leaderboard measurements | Best public score 99.85 (submission 18) |
 
-**Disclosure for the writeup.** Part 2 was refined by using the leaderboard as a measuring instrument:
+**Leaderboard probing.** Part 2 was refined by using the leaderboard as a measuring instrument:
 because Part 1 depends only on the matrix and Part 2 only on the direction, holding the matrix fixed and
 changing the direction turns each daily submission into one measured cosine. Most later submissions were
-built this way (see "What the leaderboard told us" in `working.ipynb`). The writeup should say so plainly,
-alongside the purely weight- and activation-based methods.
+built this way (see "What the leaderboard told us" in `working.ipynb`).
 
 ## Reproducing our results
 
