@@ -217,17 +217,24 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local Data & Kaggle Files
-data/
-*.csv
-*.parquet
-*.feather
-*.zip
-*.tar.gz
-*.json
-*.npz
+# ---------------------------------------------------------------------------
+# Project outputs
+#
+# Everything below is something we GENERATE and can regenerate by re-running
+# the pipeline. The inputs we were given are tracked on purpose: data/,
+# model/ and src/vendor/ are committed.
+#
+# CONTRIBUTING: "/data - small sample and fixture data only. Never secrets,
+# never generated output."
+# ---------------------------------------------------------------------------
+
+
+# Repaired weights and cached arrays we write out. Neither pattern can match
+# the given model/*.npz inputs, so they stay tracked without a negation.
+*_repaired.npz
 *.npy
 
-# OS specific files
-.DS_Store
-Thumbs.db
+# Scratch space: run artifacts, cached activations, plots for the writeup
+outputs/
+figures/
+scratch/
